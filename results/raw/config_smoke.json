@@ -1,0 +1,25 @@
+{
+  "config": {
+    "name": "smoke",
+    "targets": [
+      "sin_low"
+    ],
+    "widths": [
+      10,
+      100
+    ],
+    "seeds": [
+      0
+    ],
+    "epochs": 500,
+    "optimizer": "adam",
+    "learning_rate": 0.001,
+    "activation": "relu",
+    "n_train": 100,
+    "n_test": 1000,
+    "device": "auto",
+    "log_every": 50
+  },
+  "timestamp": "2026-04-25T21:56:33",
+  "git_sha": ""
+}
