@@ -1,0 +1,34 @@
+{
+  "config": {
+    "name": "full",
+    "targets": [
+      "sin_low",
+      "sin_high",
+      "abs"
+    ],
+    "widths": [
+      10,
+      50,
+      100,
+      500,
+      1000
+    ],
+    "seeds": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "epochs": 5000,
+    "optimizer": "adam",
+    "learning_rate": 0.001,
+    "activation": "relu",
+    "n_train": 100,
+    "n_test": 1000,
+    "device": "auto",
+    "log_every": 50
+  },
+  "timestamp": "2026-05-01T12:02:12",
+  "git_sha": "3d36b189c9bd2f4f79561fde58fedc615627c9a5"
+}
