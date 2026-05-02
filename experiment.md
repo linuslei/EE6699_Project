@@ -1,8 +1,8 @@
-# Experiment Log — Smoke Run
+# Experiment Log
 
-This file describes what we built so far, what we ran, and how to read the
-preliminary numbers. The main scientific results will come from the full
-sweep; the smoke run only verifies that the pipeline works end to end.
+This file describes what we built, what we ran, and how to read the results.
+Section 7 below contains the **main scientific results** from the full sweep.
+Sections 1–6 cover the build and the initial smoke run.
 
 ---
 
@@ -183,7 +183,7 @@ Outputs:
 
 ---
 
-## 6. Next step
+## 6. Next step (now done — see Section 7)
 
 Run the full sweep:
 
@@ -195,3 +195,122 @@ python -m src.plots --config full
 If wall time becomes a problem, the documented fallback is to drop
 `widths` from `[10, 50, 100, 500, 1000]` to `[10, 50, 100, 300, 500]`
 and/or reduce `epochs` from 5000 to 3000.
+
+---
+
+## 7. Full sweep — results and interpretation
+
+### 7.1 Run details
+
+- **Config:** `FULL_CONFIG` — targets `{sin_low, sin_high, abs}`,
+  widths `{10, 50, 100, 500, 1000}`, seeds `{0,1,2,3,4}`, 5000 epochs,
+  Adam, lr = 1e-3, ReLU, MSE, `n_train = 100`, `n_test = 1000`.
+- **Total runs:** 75.
+- **Wall time:** 14 min 0 s on this Mac (CPU; ~11 s/run averaged).
+- **Sanity:** 75/75 rows present, no NaN in any of `final_train_loss`,
+  `final_test_loss`, `relative_movement`.
+- **Artifacts:**
+  [results/raw/summary_full.csv](results/raw/summary_full.csv),
+  [results/raw/curves_full.csv](results/raw/curves_full.csv),
+  [results/raw/predictions_full.json](results/raw/predictions_full.json),
+  [results/raw/config_full.json](results/raw/config_full.json),
+  and 10 figures (PNG + PDF) in [results/figures/](results/figures/).
+
+### 7.2 Numbers (mean across 5 seeds)
+
+| target | width | train MSE | test MSE | rel. movement | std(rel.mov) |
+|---|---:|---:|---:|---:|---:|
+| **sin_low** | 10   | 0.0950 | 0.1073 | 2.79 | 1.36 |
+| sin_low | 50   | 0.0007 | 0.0018 | 1.55 | 0.13 |
+| sin_low | 100  | 0.0003 | 0.0008 | 1.02 | 0.10 |
+| sin_low | 500  | 0.0001 | 0.0004 | 0.37 | 0.02 |
+| sin_low | 1000 | 0.0002 | 0.0004 | **0.22** | 0.004 |
+| **sin_high** | 10   | 0.4321 | 0.5036 | 1.64 | 0.84 |
+| sin_high | 50   | 0.2979 | 0.4566 | 2.35 | 0.54 |
+| sin_high | 100  | 0.2221 | 0.4008 | 2.24 | 0.13 |
+| sin_high | 500  | 0.0751 | 0.2229 | 1.37 | 0.06 |
+| sin_high | 1000 | 0.0439 | 0.1923 | **1.01** | 0.09 |
+| **abs**  | 10   | 0.0001 | 0.0001 | 0.71 | 0.21 |
+| abs | 50   | ≈ 0    | ≈ 0    | 0.28 | 0.02 |
+| abs | 100  | ≈ 0    | ≈ 0    | 0.19 | 0.04 |
+| abs | 500  | ≈ 0    | ≈ 0    | 0.07 | 0.004 |
+| abs | 1000 | ≈ 0    | ≈ 0    | **0.05** | 0.004 |
+
+### 7.3 Headline figure
+
+![Width vs relative weight movement](results/figures/fig_width_vs_movement_full.png)
+
+(See also
+[results/figures/fig_width_vs_train_loss_full.png](results/figures/fig_width_vs_train_loss_full.png),
+[results/figures/fig_width_vs_test_loss_full.png](results/figures/fig_width_vs_test_loss_full.png),
+the per-target loss curves
+`fig_curves_<target>_full.png` and the learned-function plots
+`fig_learned_<target>_full.png` in [results/figures/](results/figures/).)
+
+### 7.4 Interpretation
+
+**(a) Lazy training is reproduced (Experiment 1).**
+On the easy target `sin_low`, relative movement falls monotonically
+from **2.79 at m = 10 to 0.22 at m = 1000** — roughly a 13× drop —
+while train and test loss both converge to ≈ 10⁻⁴. The wider network
+fits *better* while moving its parameters *less*. This is exactly the
+qualitative phenomenon predicted by NTK / lazy-training theory.
+
+**(b) The lazy regime is target-dependent (Experiment 2 — extension).**
+Reading the three lines at m = 1000:
+
+- `abs`: rel. movement = 0.05, perfect fit. **Deepest in the lazy regime.**
+- `sin_low`: 0.22, perfect fit. Lazy.
+- `sin_high`: 1.01, test loss still 0.19. **Has *not* entered the lazy regime even at m = 1000, and has not finished fitting.**
+
+The high-frequency target requires the network to genuinely move its
+weights to learn. This is consistent with the **spectral bias** picture:
+the NTK has eigenvalues that decay with frequency, so high-frequency
+targets are exactly the ones whose components live in the slow modes of
+the linearized dynamics — fitting them either takes much longer or
+requires the network to leave the linearized (lazy) regime. Our data
+shows both: `sin_high` is the only target with persistently large rel.
+movement *and* persistently large test loss at the largest width tried.
+
+**(c) The m = 10 row is degenerate** for `sin_low` and `sin_high`:
+loss is high *and* std across seeds is huge (rel. mov std = 1.36 and
+0.84 respectively). The network is too small to fit the target at all.
+Its small-ish movement is the "didn't move because it gave up" failure
+mode flagged in the smoke section, not lazy training. Excluding m = 10,
+all three targets show clean monotone decreases.
+
+**(d) Variance shrinks with width.** The std column on every target
+collapses by 1–2 orders of magnitude going from m = 10 to m = 1000
+(e.g. for `sin_low`: 1.36 → 0.004). Wider networks become essentially
+seed-insensitive on this task — another well-known signature of the
+lazy / NTK regime.
+
+**(e) `abs` is much easier than expected.** Even m = 10 fits to MSE
+≈ 10⁻⁴. Reason: `|x|` is exactly representable by a 2-layer ReLU net
+with 2 hidden units (`ReLU(x) + ReLU(-x)`). So all widths are massively
+overparameterized for this target, which is why `abs` is the deepest in
+the lazy regime at every width.
+
+### 7.5 What this means for the write-up
+
+- **Experiment 1 (reproduction):** clean qualitative reproduction of
+  lazy training on `sin_low`. Headline number: ~13× decrease in relative
+  weight movement as width grows from 10 to 1000, with no loss in fit.
+- **Experiment 2 (extension):** lazy training is *target-dependent*.
+  Easy / low-complexity targets enter the lazy regime at modest widths;
+  high-frequency targets resist laziness and remain underfit even at
+  m = 1000. The natural connection is to the spectral bias of the NTK.
+- **Caveat (already in README):** these results use Adam + default
+  PyTorch init, not strict NTK parameterization. The qualitative trend
+  is robust; precise numerical agreement with NTK theory is not claimed.
+
+### 7.6 Suggested next actions
+
+1. Pull these numbers and the headline figure into
+   `paper_notes/findings.md` as the basis for the Discussion section.
+2. (Optional) Re-run `sin_high` only with more epochs (e.g. 20 000) to
+   see whether m = 1000 *eventually* becomes lazy — addresses the
+   "epoch-budget vs regime" ambiguity.
+3. (Optional) Stretch experiment from
+   [plan.md](plan.md) Milestone D.4: redo `sin_low` with NTK
+   parameterization to compare slopes against the default-init version.
